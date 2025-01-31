@@ -333,6 +333,8 @@ func (s *Server) RunUntilShutdown(mainErrChan <-chan error) error {
 		}
 	}()
 
+	s.cfg.grpcListeners = grpcListeners
+
 	err := s.initialize(interceptorChain)
 	if err != nil {
 		return mkErr("unable to initialize RPC server: %v", err)
@@ -367,15 +369,17 @@ func (s *Server) RunUntilShutdown(mainErrChan <-chan error) error {
 		return mkErr("error starting gRPC listener: %v", err)
 	}
 
-	// Now start the REST proxy for our gRPC server above. We'll ensure we
-	// direct tapd to connect to its loopback address rather than a
-	// wildcard to prevent certificate issues when accessing the proxy
-	// externally.
-	stopProxy, err := startRestProxy(s.cfg, s.rpcServer)
-	if err != nil {
-		return mkErr("error starting REST proxy: %v", err)
+	if !s.cfg.DisableREST {
+		// Now start the REST proxy for our gRPC server above. We'll ensure we
+		// direct tapd to connect to its loopback address rather than a
+		// wildcard to prevent certificate issues when accessing the proxy
+		// externally.
+		stopProxy, err := startRestProxy(s.cfg, s.rpcServer)
+		if err != nil {
+			return mkErr("error starting REST proxy: %v", err)
+		}
+		defer stopProxy()
 	}
-	defer stopProxy()
 
 	// TODO(roasbeef): make macaroons service, needs the lnd APIs present
 	// an abstracted

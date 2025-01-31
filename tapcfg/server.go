@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"fmt"
+	"strconv"
 
 	"github.com/btcsuite/btclog/v2"
 	"github.com/davecgh/go-spew/spew"
@@ -24,6 +25,7 @@ import (
 	"github.com/lightninglabs/taproot-assets/universe"
 	"github.com/lightningnetwork/lnd"
 	"github.com/lightningnetwork/lnd/clock"
+	"github.com/lightningnetwork/lnd/lncfg"
 	"github.com/lightningnetwork/lnd/signal"
 )
 
@@ -616,6 +618,45 @@ func CreateServerFromConfig(cfg *Config, cfgLogger btclog.Logger,
 	shutdownInterceptor signal.Interceptor, enableChannelFeatures bool,
 	mainErrChan chan<- error) (*tap.Server, error) {
 
+	// At least one RPCListener is required. So listen on localhost per
+	// default.
+	if len(cfg.RpcConf.RawRPCListeners) == 0 {
+		addr := fmt.Sprintf("localhost:%d", defaultRPCPort)
+		cfg.RpcConf.RawRPCListeners = append(
+			cfg.RpcConf.RawRPCListeners, addr,
+		)
+	}
+
+	// Listen on localhost if no REST listeners were specified.
+	if len(cfg.RpcConf.RawRESTListeners) == 0 {
+		addr := fmt.Sprintf("localhost:%d", defaultRESTPort)
+		cfg.RpcConf.RawRESTListeners = append(
+			cfg.RpcConf.RawRESTListeners, addr,
+		)
+	}
+
+	// Add default port to all RPC listener addresses if needed and remove
+	// duplicate addresses.
+	var err error
+	cfg.rpcListeners, err = lncfg.NormalizeAddresses(
+		cfg.RpcConf.RawRPCListeners, strconv.Itoa(defaultRPCPort),
+		cfg.net.ResolveTCPAddr,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error normalizing RPC listen addrs: %v", err)
+	}
+
+	// Add default port to all REST listener addresses if needed and remove
+	// duplicate addresses.
+	cfg.restListeners, err = lncfg.NormalizeAddresses(
+		cfg.RpcConf.RawRESTListeners, strconv.Itoa(defaultRESTPort),
+		cfg.net.ResolveTCPAddr,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error normalizing REST listen addrs: %v",
+			err)
+	}
+
 	// Given the config above, grab the TLS config which includes the set
 	// of dial options, and also the listeners we'll use to listen on the
 	// RPC system.
@@ -667,6 +708,7 @@ func CreateServerFromConfig(cfg *Config, cfgLogger btclog.Logger,
 		LetsEncryptListen:          cfg.RpcConf.LetsEncryptListen,
 		LetsEncryptEmail:           cfg.RpcConf.LetsEncryptEmail,
 		LetsEncryptDomain:          cfg.RpcConf.LetsEncryptDomain,
+		DisableREST:                cfg.RpcConf.DisableRest,
 	}
 
 	return tap.NewServer(&serverCfg.ChainParams, serverCfg), nil

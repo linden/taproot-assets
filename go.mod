@@ -2,6 +2,9 @@ module github.com/lightninglabs/taproot-assets
 
 go 1.23.6
 
+replace github.com/btcsuite/btcd => ../btcd
+replace github.com/lightningnetwork/lnd => ../lnd
+
 require (
 	github.com/btcsuite/btcd v0.24.3-0.20250318170759-4f4ea81776d6
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4

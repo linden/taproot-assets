@@ -59,6 +59,8 @@ type RPCConfig struct {
 	LetsEncryptDomain string
 
 	LetsEncryptEmail string
+
+	DisableREST bool
 }
 
 // DatabaseConfig is the config that holds all the persistence related structs
@@ -240,4 +242,6 @@ type Config struct {
 	*RPCConfig
 
 	*DatabaseConfig
+
+	grpcListeners []*lnd.ListenerWithSignal
 }

@@ -826,50 +826,11 @@ func ValidateConfig(cfg Config, cfgLogger btclog.Logger) (*Config, error) {
 		os.Exit(0)
 	}
 
-	// At least one RPCListener is required. So listen on localhost per
-	// default.
-	if len(cfg.RpcConf.RawRPCListeners) == 0 {
-		addr := fmt.Sprintf("localhost:%d", defaultRPCPort)
-		cfg.RpcConf.RawRPCListeners = append(
-			cfg.RpcConf.RawRPCListeners, addr,
-		)
-	}
-
-	// Listen on localhost if no REST listeners were specified.
-	if len(cfg.RpcConf.RawRESTListeners) == 0 {
-		addr := fmt.Sprintf("localhost:%d", defaultRESTPort)
-		cfg.RpcConf.RawRESTListeners = append(
-			cfg.RpcConf.RawRESTListeners, addr,
-		)
-	}
-
-	// Add default port to all RPC listener addresses if needed and remove
-	// duplicate addresses.
-	var err error
-	cfg.rpcListeners, err = lncfg.NormalizeAddresses(
-		cfg.RpcConf.RawRPCListeners, strconv.Itoa(defaultRPCPort),
-		cfg.net.ResolveTCPAddr,
-	)
-	if err != nil {
-		return nil, mkErr("error normalizing RPC listen addrs: %v", err)
-	}
-
-	// Add default port to all REST listener addresses if needed and remove
-	// duplicate addresses.
-	cfg.restListeners, err = lncfg.NormalizeAddresses(
-		cfg.RpcConf.RawRESTListeners, strconv.Itoa(defaultRESTPort),
-		cfg.net.ResolveTCPAddr,
-	)
-	if err != nil {
-		return nil, mkErr("error normalizing REST listen addrs: %v",
-			err)
-	}
-
 	// For each of the RPC listeners (REST+gRPC), we'll ensure that users
 	// have specified a safe combo for authentication. If not, we'll bail
 	// out with an error. Since we don't allow disabling TLS for gRPC
 	// connections we pass in tlsActive=true.
-	err = lncfg.EnforceSafeAuthentication(
+	err := lncfg.EnforceSafeAuthentication(
 		cfg.rpcListeners, !cfg.RpcConf.NoMacaroons, true,
 	)
 	if err != nil {
@@ -941,14 +902,26 @@ func getTLSConfig(cfg *Config,
 		// For restListen we will call ListenOnAddress if TLS is
 		// disabled.
 		if cfg.RpcConf.DisableRestTLS {
+			listener, err := lncfg.ListenOnAddress(addr)
+			if err != nil {
+				return nil, err
+			}
+
 			cfgLogger.Infof("Starting HTTP REST proxy listener "+
-				"at %v", addr.String())
-			return lncfg.ListenOnAddress(addr)
+				"at %v", listener.Addr().String())
+
+			return listener, nil
+		}
+
+		listener, err := lncfg.TLSListenOnAddress(addr, tlsCfg)
+		if err != nil {
+			return nil, err
 		}
 
 		cfgLogger.Infof("Starting HTTPS REST proxy listener "+
-			"at %v", addr.String())
-		return lncfg.TLSListenOnAddress(addr, tlsCfg)
+			"at %v", listener.Addr().String())
+
+		return listener, nil
 	}
 
 	return serverOpts, restDialOpts, restListen, nil
