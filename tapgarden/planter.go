@@ -927,6 +927,10 @@ func (c *ChainPlanter) anchorTxFeeRate(ctx context.Context,
 	return feeRate, nil
 }
 
+// WalletFundPsbt is a function that funds a PSBT packet.
+type WalletFundPsbt = func(ctx context.Context,
+	anchorPkt psbt.Packet) (tapsend.FundedPsbt, error)
+
 // fundGenesisPsbt generates a PSBT packet we'll use to create an asset.  In
 // order to be able to create an asset, we need an initial genesis outpoint. To
 // obtain this we'll ask the wallet to fund a PSBT template for GenesisAmtSats
@@ -935,7 +939,7 @@ func (c *ChainPlanter) anchorTxFeeRate(ctx context.Context,
 // that's dependent on the genesis outpoint.
 func (c *ChainPlanter) fundGenesisPsbt(ctx context.Context,
 	batchKey asset.SerializedKey,
-	feeRate chainfee.SatPerKWeight) (FundedMintAnchorPsbt, error) {
+	walletFundPsbt WalletFundPsbt) (FundedMintAnchorPsbt, error) {
 
 	var zero FundedMintAnchorPsbt
 	log.Infof("Attempting to fund batch: %x", batchKey)
@@ -979,9 +983,7 @@ func (c *ChainPlanter) fundGenesisPsbt(ctx context.Context,
 	}
 	log.Tracef("Unfunded batch anchor PSBT: %v", spew.Sdump(genesisPkt))
 
-	fundedGenesisPkt, err := c.cfg.Wallet.FundPsbt(
-		ctx, &genesisPkt, 1, feeRate, -1,
-	)
+	fundedGenesisPkt, err := walletFundPsbt(ctx, genesisPkt)
 	if err != nil {
 		return zero, fmt.Errorf("unable to fund psbt: %w", err)
 	}
@@ -997,7 +999,7 @@ func (c *ChainPlanter) fundGenesisPsbt(ctx context.Context,
 
 	// Classify anchor transaction output indexes.
 	anchorOutIndexes, err := anchorTxOutputIndexes(
-		*fundedGenesisPkt, preCommitmentTxOut,
+		fundedGenesisPkt, preCommitmentTxOut,
 	)
 	if err != nil {
 		return zero, fmt.Errorf("unable to determine output indexes: "+
@@ -1034,7 +1036,7 @@ func (c *ChainPlanter) fundGenesisPsbt(ctx context.Context,
 
 	// Formulate a funded minting anchor PSBT from the funded PSBT.
 	fundedMintAnchorPsbt, err := NewFundedMintAnchorPsbt(
-		*fundedGenesisPkt, anchorOutIndexes, preCommitmentOut,
+		fundedGenesisPkt, anchorOutIndexes, preCommitmentOut,
 	)
 	if err != nil {
 		return zero, fmt.Errorf("unable to create funded minting "+
@@ -2024,7 +2026,27 @@ func (c *ChainPlanter) fundBatch(ctx context.Context, params FundParams,
 		}
 
 		batchKey := asset.ToSerialized(batch.BatchKey.PubKey)
-		mintAnchorTx, err := c.fundGenesisPsbt(ctx, batchKey, feeRate)
+
+		// walletFundPsbt is a closure that will be used to fund the
+		// batch with the specified fee rate.
+		walletFundPsbt := func(ctx context.Context,
+			anchorPkt psbt.Packet) (tapsend.FundedPsbt, error) {
+
+			var zero tapsend.FundedPsbt
+
+			fundedPkt, err := c.cfg.Wallet.FundPsbt(
+				ctx, &anchorPkt, 1, feeRate, -1,
+			)
+			if err != nil {
+				return zero, err
+			}
+
+			return *fundedPkt, nil
+		}
+
+		mintAnchorTx, err := c.fundGenesisPsbt(
+			ctx, batchKey, walletFundPsbt,
+		)
 		if err != nil {
 			return fmt.Errorf("unable to fund minting PSBT for "+
 				"batch: %x %w", batchKey[:], err)
