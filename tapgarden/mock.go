@@ -59,21 +59,32 @@ func RandSeedlings(t testing.TB, numSeedlings int) map[string]*Seedling {
 // RandSeedlingMintingBatch creates a new minting batch with only random
 // seedlings populated for testing.
 func RandSeedlingMintingBatch(t testing.TB, numSeedlings int) *MintingBatch {
-	genesisTx := NewGenesisTx(t, chainfee.FeePerKwFloor)
-	BatchKey, _ := test.RandKeyDesc(t)
-	return &MintingBatch{
-		BatchKey:     BatchKey,
+	batchKey, _ := test.RandKeyDesc(t)
+	batch := MintingBatch{
+		BatchKey:     batchKey,
 		Seedlings:    RandSeedlings(t, numSeedlings),
 		HeightHint:   test.RandInt[uint32](),
 		CreationTime: time.Now(),
-		GenesisPacket: &FundedMintAnchorPsbt{
-			FundedPsbt: tapsend.FundedPsbt{
-				Pkt:               &genesisTx,
-				ChangeOutputIndex: 1,
-			},
-			AssetAnchorOutIdx: 0,
-		},
 	}
+
+	walletFundPsbt := func(ctx context.Context,
+		anchorPkt psbt.Packet) (tapsend.FundedPsbt, error) {
+
+		FundGenesisTx(&anchorPkt, chainfee.FeePerKwFloor)
+
+		return tapsend.FundedPsbt{
+			Pkt:               &anchorPkt,
+			ChangeOutputIndex: 1,
+		}, nil
+	}
+
+	// Fund genesis packet.
+	ctx := context.Background()
+	fundedPsbt, err := fundGenesisPsbt(ctx, &batch, walletFundPsbt)
+	require.NoError(t, err)
+
+	batch.GenesisPacket = &fundedPsbt
+	return &batch
 }
 
 type MockWalletAnchor struct {
