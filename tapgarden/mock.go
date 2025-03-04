@@ -56,13 +56,43 @@ func RandSeedlings(t testing.TB, numSeedlings int) map[string]*Seedling {
 	return seedlings
 }
 
-// RandSeedlingMintingBatch creates a new minting batch with only random
-// seedlings populated for testing.
-func RandSeedlingMintingBatch(t testing.TB, numSeedlings int) *MintingBatch {
+// MintBatchOptions is a set of options for creating a new minting batch.
+type MintBatchOptions struct {
+	// totalSeedlings specifies the number of seedlings to generate in this
+	// minting batch. The seedlings are randomly assigned as grouped or
+	// ungrouped.
+	totalSeedlings int
+}
+
+// MintBatchOption is a functional option for creating a new minting batch.
+type MintBatchOption func(*MintBatchOptions)
+
+// DefaultMintBatchOptions returns a new set of default minting batch options.
+func DefaultMintBatchOptions() MintBatchOptions {
+	return MintBatchOptions{}
+}
+
+// WithTotalSeedlings sets the total number of seedlings to populate in the
+// minting batch.
+func WithTotalSeedlings(count int) MintBatchOption {
+	return func(options *MintBatchOptions) {
+		options.totalSeedlings = count
+	}
+}
+
+// RandMintingBatch creates a new minting batch with only random seedlings
+// populated for testing.
+func RandMintingBatch(t testing.TB, opts ...MintBatchOption) *MintingBatch {
+	// Construct options.
+	options := DefaultMintBatchOptions()
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	batchKey, _ := test.RandKeyDesc(t)
 	batch := MintingBatch{
 		BatchKey:     batchKey,
-		Seedlings:    RandSeedlings(t, numSeedlings),
+		Seedlings:    RandSeedlings(t, options.totalSeedlings),
 		HeightHint:   test.RandInt[uint32](),
 		CreationTime: time.Now(),
 	}
