@@ -1920,6 +1920,33 @@ func TestUpsertMintAnchorUniCommitment(t *testing.T) {
 	)
 }
 
+// TestCommitMintingBatchSeedlings tests that we're able to properly write and
+// read a base minting batch on disk. This test covers the state when a batch
+// only has seedlings, without any fully formed assets.
+func TestBlah(t *testing.T) {
+	t.Parallel()
+
+	assetStore, _, _ := newAssetStore(t)
+
+	ctx := context.Background()
+	const numSeedlings = 5
+
+	// First, we'll write a new minting batch to disk, including an
+	// internal key and a set of seedlings. One random seedling will
+	// be a reissuance into a specific group.
+	mintingBatch := tapgarden.RandMintingBatch(
+		t, tapgarden.WithTotalSeedlings(1),
+		tapgarden.WithTotalGroups([]int{1}),
+		tapgarden.WithUniverseCommitments(true),
+	)
+	//_, randGroup, _ := addRandGroupToBatch(
+	//	t, assetStore, ctx, mintingBatch.Seedlings,
+	//)
+	//_, randSiblingHash := addRandSiblingToBatch(t, mintingBatch)
+	err := assetStore.CommitMintingBatch(ctx, mintingBatch)
+	require.NoError(t, err)
+}
+
 func init() {
 	rand.Seed(time.Now().Unix())
 
