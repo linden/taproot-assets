@@ -7480,7 +7480,7 @@ func (r *rpcServer) SendPayment(req *tchrpc.SendPaymentRequest,
 		rpcSpecifier := marshalAssetSpecifier(specifier)
 
 		// We can now query the asset channels we have.
-		assetChan, err := r.cfg.RfqManager.RfqChannel(
+		chanMap, err := r.cfg.RfqManager.RfqChannel(
 			ctx, specifier, peerPubKey, rfq.SendIntention,
 		)
 		if err != nil {
@@ -7488,10 +7488,22 @@ func (r *rpcServer) SendPayment(req *tchrpc.SendPaymentRequest,
 				"use: %w", err)
 		}
 
+		// TODO(george): temporary as multi-rfq send is not supported
+		// yet
+		if peerPubKey == nil && len(chanMap) > 1 {
+			return fmt.Errorf("multiple valid peers found, need " +
+				"specify peer pub key")
+		}
 		// Even if the user didn't specify the peer public key before,
 		// we definitely know it now. So let's make sure it's always
 		// set.
-		peerPubKey = &assetChan.ChannelInfo.PubKeyBytes
+		//
+		// TODO(george): we just grab the first value, this is temporary
+		// until multi-rfq send is implemented.
+		for _, v := range chanMap {
+			peerPubKey = &v[0].ChannelInfo.PubKeyBytes
+			break
+		}
 
 		// paymentMaxAmt is the maximum amount that the counterparty is
 		// expected to pay. This is the amount that the invoice is
@@ -7800,7 +7812,7 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 	}
 
 	// We can now query the asset channels we have.
-	assetChan, err := r.cfg.RfqManager.RfqChannel(
+	chanMap, err := r.cfg.RfqManager.RfqChannel(
 		ctx, specifier, peerPubKey, rfq.ReceiveIntention,
 	)
 	if err != nil {
@@ -7808,9 +7820,15 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 			err)
 	}
 
+	// TODO(george): this is temporary just for the commit to compile.
+	var firstChan rfq.ChannelWithSpecifier
+	for _, v := range chanMap {
+		firstChan = v[0]
+	}
+
 	// Even if the user didn't specify the peer public key before, we
 	// definitely know it now. So let's make sure it's always set.
-	peerPubKey = &assetChan.ChannelInfo.PubKeyBytes
+	peerPubKey = &firstChan.ChannelInfo.PubKeyBytes
 
 	expirySeconds := iReq.Expiry
 	if expirySeconds == 0 {
@@ -7883,7 +7901,7 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 	// the quote, alongside the channel's routing policy. We need to choose
 	// the policy that points towards us, as the payment will be flowing in.
 	// So we get the policy that's being set by the remote peer.
-	channelID := assetChan.ChannelInfo.ChannelID
+	channelID := firstChan.ChannelInfo.ChannelID
 	inboundPolicy, err := r.getInboundPolicy(
 		ctx, channelID, peerPubKey.String(),
 	)
