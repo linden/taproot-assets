@@ -18,6 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TaprootAssetChannelsClient interface {
+	// litcli: `ln fundchannel`
 	// FundChannel initiates the channel funding negotiation with a peer for the
 	// creation of a channel that contains a specified amount of a given asset.
 	FundChannel(ctx context.Context, in *FundChannelRequest, opts ...grpc.CallOption) (*FundChannelResponse, error)
@@ -27,15 +28,18 @@ type TaprootAssetChannelsClient interface {
 	// does not perform any checks on the data provided, other than pure format
 	// validation.
 	EncodeCustomRecords(ctx context.Context, in *EncodeCustomRecordsRequest, opts ...grpc.CallOption) (*EncodeCustomRecordsResponse, error)
+	// litcli: `ln sendpayment`
 	// SendPayment is a wrapper around lnd's routerrpc.SendPaymentV2 RPC method
 	// with asset specific parameters. It allows RPC users to send asset keysend
 	// payments (direct payments) or payments to an invoice with a specified asset
 	// amount.
 	SendPayment(ctx context.Context, in *SendPaymentRequest, opts ...grpc.CallOption) (TaprootAssetChannels_SendPaymentClient, error)
+	// litcli: `ln addinvoice`
 	// AddInvoice is a wrapper around lnd's lnrpc.AddInvoice method with asset
 	// specific parameters. It allows RPC users to create invoices that correspond
 	// to the specified asset amount.
 	AddInvoice(ctx context.Context, in *AddInvoiceRequest, opts ...grpc.CallOption) (*AddInvoiceResponse, error)
+	// litcli: `ln decodeassetinvoice`
 	// DecodeAssetPayReq is similar to lnd's lnrpc.DecodePayReq, but it accepts an
 	// asset ID and returns the invoice amount expressed in asset units along side
 	// the normal information.
@@ -122,6 +126,7 @@ func (c *taprootAssetChannelsClient) DecodeAssetPayReq(ctx context.Context, in *
 // All implementations must embed UnimplementedTaprootAssetChannelsServer
 // for forward compatibility
 type TaprootAssetChannelsServer interface {
+	// litcli: `ln fundchannel`
 	// FundChannel initiates the channel funding negotiation with a peer for the
 	// creation of a channel that contains a specified amount of a given asset.
 	FundChannel(context.Context, *FundChannelRequest) (*FundChannelResponse, error)
@@ -131,15 +136,18 @@ type TaprootAssetChannelsServer interface {
 	// does not perform any checks on the data provided, other than pure format
 	// validation.
 	EncodeCustomRecords(context.Context, *EncodeCustomRecordsRequest) (*EncodeCustomRecordsResponse, error)
+	// litcli: `ln sendpayment`
 	// SendPayment is a wrapper around lnd's routerrpc.SendPaymentV2 RPC method
 	// with asset specific parameters. It allows RPC users to send asset keysend
 	// payments (direct payments) or payments to an invoice with a specified asset
 	// amount.
 	SendPayment(*SendPaymentRequest, TaprootAssetChannels_SendPaymentServer) error
+	// litcli: `ln addinvoice`
 	// AddInvoice is a wrapper around lnd's lnrpc.AddInvoice method with asset
 	// specific parameters. It allows RPC users to create invoices that correspond
 	// to the specified asset amount.
 	AddInvoice(context.Context, *AddInvoiceRequest) (*AddInvoiceResponse, error)
+	// litcli: `ln decodeassetinvoice`
 	// DecodeAssetPayReq is similar to lnd's lnrpc.DecodePayReq, but it accepts an
 	// asset ID and returns the invoice amount expressed in asset units along side
 	// the normal information.
