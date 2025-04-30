@@ -82,8 +82,9 @@ type QueryParams struct {
 // known to universe servers in our federation.
 type AssetSyncer interface {
 	// SyncAssetInfo queries the universes in our federation for genesis
-	// and asset group information about the given asset ID.
-	SyncAssetInfo(ctx context.Context, assetID *asset.ID) error
+	// and asset group information about the given asset ID or group key.
+	SyncAssetInfo(ctx context.Context, assetID *asset.ID,
+		groupKey *btcec.PublicKey) error
 
 	// EnableAssetSync updates the sync config for the given asset so that
 	// we sync future issuance proofs.
@@ -232,7 +233,7 @@ func (b *Book) QueryAssetInfo(ctx context.Context,
 	log.Debugf("Asset %v is unknown, attempting to bootstrap", id.String())
 
 	// Use the AssetSyncer to query our universe federation for the asset.
-	err = b.cfg.Syncer.SyncAssetInfo(ctx, &id)
+	err = b.cfg.Syncer.SyncAssetInfo(ctx, &id, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -262,6 +263,25 @@ func (b *Book) QueryAssetInfo(ctx context.Context,
 	}
 
 	return assetGroup, nil
+}
+
+// SyncAssetGroup attempts to enable asset sync for the given asset group, then
+// perform an initial sync with the federation for that group.
+func (b *Book) SyncAssetGroup(ctx context.Context,
+	groupKey *btcec.PublicKey) error {
+
+	groupInfo := &asset.AssetGroup{
+		GroupKey: &asset.GroupKey{
+			GroupPubKey: *groupKey,
+		},
+	}
+	err := b.cfg.Syncer.EnableAssetSync(ctx, groupInfo)
+	if err != nil {
+		return fmt.Errorf("unable to enable asset sync: %w", err)
+	}
+
+	// Use the AssetSyncer to query our universe federation for the asset.
+	return b.cfg.Syncer.SyncAssetInfo(ctx, nil, groupKey)
 }
 
 // FetchAssetMetaByHash attempts to fetch an asset meta based on an asset hash.
@@ -296,7 +316,7 @@ func (b *Book) FetchAssetMetaForAsset(ctx context.Context,
 		assetID.String())
 
 	// Use the AssetSyncer to query our universe federation for the asset.
-	err = b.cfg.Syncer.SyncAssetInfo(ctx, &assetID)
+	err = b.cfg.Syncer.SyncAssetInfo(ctx, &assetID, nil)
 	if err != nil {
 		return nil, err
 	}
