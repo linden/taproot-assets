@@ -2668,7 +2668,11 @@ func (c *ChainPlanter) prepAssetSeedling(ctx context.Context,
 	// If a group internal key or tapscript root is specified, emission must
 	// also be enabled.
 	if !req.EnableEmission {
-		if req.GroupInternalKey != nil {
+		// For re-issuance or regular assets, the group internal key
+		// shouldn't be set. It is, however, set for re-issuance with
+		// an external key, because the internal group key is the key
+		// we compare the external key against.
+		if req.GroupInternalKey != nil && req.ExternalKey.IsNone() {
 			return fmt.Errorf("cannot specify group internal key " +
 				"without enabling emission")
 		}
