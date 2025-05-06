@@ -509,6 +509,14 @@ func DistributeCoins(inputs []*proof.Proof, allocations []*Allocation,
 			},
 		)
 
+		// Before we create the virtual packet, we need to sort the
+		// proofs by amount and then by script key. This is important to
+		// ensure that the proofs are sorted in a deterministic way,
+		// before we assign them to the inputs of the virtual packet.
+		slices.SortFunc(proofsByID, func(i, j *proof.Proof) int {
+			return InputSort(i.Asset, j.Asset)
+		})
+
 		pkt, err := tappsbt.FromProofs(
 			proofsByID, chainParams, vPktVersion,
 		)
