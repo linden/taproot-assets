@@ -210,9 +210,8 @@ func (p *Proof) verifyInclusionProof() (*commitment.TapCommitment, error) {
 		return nil, err
 	}
 
-	err = p.verifyRemainingOutputs(p2trOutputs)
-	if err != nil {
-		return nil, err
+	if len(p2trOutputs) > 0 {
+		return nil, ErrMissingExclusionProofs
 	}
 
 	return commitment, nil
