@@ -231,11 +231,6 @@ func (p *Proof) verifySplitRootProof() error {
 func (p *Proof) verifyExclusionProofs() (*commitment.TapCommitmentVersion,
 	error) {
 
-	// There is nothing to check so return early.
-	if p.ExclusionProofs == nil {
-		return nil, nil
-	}
-
 	// Gather all P2TR outputs in the on-chain transaction. The STXO proofs
 	// are tracked using a set of serialized keys. We ignore that set when
 	// verifying V0 exclusion proofs.
@@ -249,6 +244,11 @@ func (p *Proof) verifyExclusionProofs() (*commitment.TapCommitmentVersion,
 		}
 
 		p2trOutputs.Add(uint32(i))
+	}
+
+	// There is nothing to check so return early.
+	if len(p2trOutputs) == 0 {
+		return nil, nil
 	}
 
 	// Early pass to determine if we're dealing with v0 or v1 proofs.
@@ -292,8 +292,7 @@ func (p *Proof) verifyV0ExclusionProofs(p2trOutputs fn.Set[uint32]) (
 	}
 
 	// All proofs must have similar versions.
-	firstVersion := maps.Values(commitVersions)[0][0]
-	return verifySTXOVersions(firstVersion, commitVersions)
+	return verifySTXOVersions(commitVersions)
 }
 
 // verifyV1ExclusionProofs verifies all version 2 exclusion proofs.
@@ -362,8 +361,7 @@ func (p *Proof) verifyV1ExclusionProofs(
 	}
 
 	// All proofs must have similar versions.
-	firstVersion := maps.Values(commitVersions)[0][0]
-	return verifySTXOVersions(firstVersion, commitVersions)
+	return verifySTXOVersions(commitVersions)
 }
 
 // handleBasicExclusionProof handles a basic (non-STXO) exclusion proof.
@@ -477,9 +475,10 @@ func (p *Proof) verifyRemainingOutputs(p2trOutputs P2TROutputsSTXOs) error {
 }
 
 // verifySTXOVersions verifies all STXO versions match.
-func verifySTXOVersions(firstVersion commitment.TapCommitmentVersion,
-	versions map[uint32][]commitment.TapCommitmentVersion) (
+func verifySTXOVersions(versions map[uint32][]commitment.TapCommitmentVersion) (
 	*commitment.TapCommitmentVersion, error) {
+
+	firstVersion := maps.Values(versions)[0][0]
 
 	for outIdx, stxoVersions := range versions {
 		for idx := range stxoVersions {
